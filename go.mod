@@ -1,0 +1,19 @@
+module github.com/capybari-repo/capybari-analyzer-identity
+
+go 1.27.1
+
+require (
+	github.com/capybari-repo/capybari-core v0.0.0
+	github.com/capybari-repo/capybari-schemas v0.0.0
+	golang.org/x/net v0.59.0
+	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
+	golang.org/x/text v0.42.0 // indirect
+)
+
+replace github.com/capybari-repo/capybari-core => ../capybari-core
+
+replace github.com/capybari-repo/capybari-schemas => ../capybari-schemas
