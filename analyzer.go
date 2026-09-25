@@ -152,6 +152,7 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 		title := strings.TrimSpace(webtext.Visible(m[1]))
 		names = append(names, reSep.Split(title, -1)...)
 	}
+	nameIsBrand := true // false when only the page text matched the domain
 	if len(names) > 0 && len(label) >= 3 && !isIP {
 		id.BrandEvaluated = true
 		id.Brand = strings.TrimSpace(names[0])
@@ -171,6 +172,7 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 		}
 		if !id.BrandMatches && strings.Contains(text, label) {
 			id.BrandMatches = true // the domain name appears on the page itself
+			nameIsBrand = false
 		}
 	}
 
@@ -220,7 +222,7 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 			missing = append(missing, "DMARC policy is p=none (monitor only)")
 		}
 		name := id.Domain
-		if id.BrandMatches && id.Brand != "" && len(id.Brand) <= 30 {
+		if id.BrandMatches && nameIsBrand && id.Brand != "" && len(id.Brand) <= 30 {
 			name = id.Brand
 		}
 		add(finding.Finding{

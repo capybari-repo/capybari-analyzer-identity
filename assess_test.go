@@ -109,6 +109,16 @@ func TestSixMonthOldShopIsNew(t *testing.T) {
 	}
 }
 
+func TestEmailNamesTheDomainWhenTheTitleIsNotTheBrand(t *testing.T) {
+	srv := registry(t, "2020-01-01T00:00:00Z", "2030-01-01T00:00:00Z")
+	a := &Analyzer{Bootstrap: srv.URL + "/bootstrap", LookupTXT: dns(map[string][]string{"_dmarc.dackapps.com": {"v=DMARC1; p=none;"}, "dackapps.com": {"v=spf1 ~all"}})}
+	ws := &facts.WebSnapshot{FinalURL: "https://dackapps.com/", Body: `<title>Cash App: Make Money Online</title><body>by DackApps</body>`}
+	fs, _, _, _ := a.assess(context.Background(), ws, &facts.Commerce{Sells: true}, srv.Client(), now)
+	if f := byCat(fs)["email-spoofable"]; !strings.HasPrefix(f.Title, "Email in dackapps.com's name can be faked") {
+		t.Fatalf("a page title that is not the brand must not name the email: %q", f.Title)
+	}
+}
+
 func TestOfflineAndIPs(t *testing.T) {
 	a := &Analyzer{}
 	ws := &facts.WebSnapshot{FinalURL: "http://127.0.0.1:8080/", Body: `<title>Whatever</title>`}
