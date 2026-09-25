@@ -1,6 +1,6 @@
 id: identity
 name: Domain & Identity
-version: 0.1.0
+version: 0.2.0
 category: trust
 summary: Who is behind a website - how long ago its domain was registered and when it expires (RDAP, the public registration-data service), whether email from the domain is protected against spoofing (SPF and DMARC in public DNS), and whether the name the site gives itself matches its domain. Feeds the Trust question of the verdict.
 stability: experimental
