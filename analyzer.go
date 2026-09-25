@@ -32,7 +32,8 @@ var capability = analyzer.MustParseCapability(capabilityYAML)
 
 // Thresholds.
 const (
-	newDomain      = 90 * 24 * time.Hour
+	newDomain      = 182 * 24 * time.Hour // six months
+	brandNew       = 30 * 24 * time.Hour
 	expiringWithin = 30 * 24 * time.Hour
 )
 
@@ -182,14 +183,18 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 		fs = append(fs, f)
 	}
 	if !id.Registered.IsZero() && now.Sub(id.Registered) < newDomain {
+		age := now.Sub(id.Registered)
 		sev := finding.Low
-		if sells {
+		switch {
+		case sells && age < brandNew:
+			sev = finding.High
+		case sells:
 			sev = finding.Medium
 		}
 		add(finding.Finding{
 			Category: "domain-new", Severity: sev, Confidence: finding.ConfidenceHigh,
-			Title:       fmt.Sprintf("Domain registered %d days ago", int(now.Sub(id.Registered).Hours()/24)),
-			Description: fmt.Sprintf("%s was registered on %s. Brand-new domains are normal for new products, but also typical of short-lived shops and look-alike sites; check who is behind it before paying.", id.Domain, id.Registered.Format("2 Jan 2006")),
+			Title:       fmt.Sprintf("Domain only %s (registered %s)", ageText(age), id.Registered.Format("Jan 2006")),
+			Description: fmt.Sprintf("%s was registered on %s. New domains are normal for new products, but they have no track record, and they are also typical of short-lived shops and look-alike sites. Check who is behind it before paying.", id.Domain, id.Registered.Format("2 Jan 2006")),
 			Evidence:    []finding.Evidence{{Location: finding.Location{URL: ws.FinalURL}, Detail: "RDAP registration " + id.Registered.Format("2006-01-02")}},
 		})
 	}
@@ -214,9 +219,13 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 		case !strongDMARC(id.DMARC):
 			missing = append(missing, "DMARC policy is p=none (monitor only)")
 		}
+		name := id.Domain
+		if id.BrandMatches && id.Brand != "" && len(id.Brand) <= 30 {
+			name = id.Brand
+		}
 		add(finding.Finding{
 			Category: "email-spoofable", Severity: finding.Low, Confidence: finding.ConfidenceHigh,
-			Title:       "Email from " + id.Domain + " can be spoofed (" + strings.Join(missing, ", ") + ")",
+			Title:       fmt.Sprintf("Email in %s's name can be faked (%s)", name, strings.Join(missing, ", ")),
 			Description: "Without SPF and an enforcing DMARC policy, anyone can send email that appears to come from this domain, so customers can receive convincing phishing in its name.",
 			Evidence:    []finding.Evidence{{Location: finding.Location{URL: "dns:" + id.Domain}, Detail: fmt.Sprintf("SPF: %q; DMARC: %q", id.SPF, id.DMARC)}},
 			Remediation: &finding.Remediation{Summary: "Publish an SPF record and a DMARC record with p=quarantine or p=reject."},
@@ -233,6 +242,15 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 	}
 
 	return fs, id, limits, nil
+}
+
+// ageText phrases a domain's age: "12 days old", "about 3 months old".
+func ageText(d time.Duration) string {
+	days := int(d.Hours() / 24)
+	if days < 60 {
+		return fmt.Sprintf("%d days old", days)
+	}
+	return fmt.Sprintf("about %d months old", days/30)
 }
 
 func suffixOf(domain string) string {

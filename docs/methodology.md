@@ -12,7 +12,7 @@ The domain is the registrable domain (public suffix + 1), so `shop.example.co.uk
 
 | Rule | Trigger | Severity | Confidence | Buyer impact |
 |---|---|---|---|---|
-| `domain-new` | registered < 90 days ago | low; medium if it sells (from `commerce`) | high | support cost |
+| `domain-new` | registered < 6 months ago | low; medium if it sells (from `commerce`); high if it sells and is < 30 days old | high | support cost |
 | `domain-expiring` | expiry within 30 days | low | high | support cost |
 | `email-spoofable` | sells, or publishes an email address at the domain, **and** no SPF record or DMARC missing / `p=none` | low | high | support cost |
 | `brand-mismatch` | no title/site-name part contains the domain or subdomain label (or vice versa, for names of 4+ characters), and the domain label does not appear in the page text | low | low | support cost |

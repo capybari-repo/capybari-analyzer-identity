@@ -21,7 +21,7 @@ func registry(t *testing.T, registered, expires string) *httptest.Server {
 	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/bootstrap":
-			w.Write([]byte(`{"services":[[["com","uk"],["` + srv.URL + `/rdap/"]]]}`))
+			w.Write([]byte(`{"services":[[["com","uk","pub"],["` + srv.URL + `/rdap/"]]]}`))
 		case strings.HasPrefix(r.URL.Path, "/rdap/domain/"):
 			w.Write([]byte(`{"events":[{"eventAction":"registration","eventDate":"` + registered + `"},{"eventAction":"expiration","eventDate":"` + expires + `"}],
 "entities":[{"roles":["registrar"],"vcardArray":["vcard",[["version",{},"text","4.0"],["fn",{},"text","Example Registrar"]]]}]}`))
@@ -72,13 +72,13 @@ func TestNewSpoofableMismatchedShop(t *testing.T) {
 	ws := &facts.WebSnapshot{FinalURL: "https://bestdeals-outlet.com/", Body: `<html><head><title>Nike Official Store | Sale</title><meta property="og:site_name" content="Nike"></head><body>Big sale</body></html>`}
 	fs, _, _, _ := a.assess(context.Background(), ws, &facts.Commerce{Sells: true}, srv.Client(), now)
 	got := byCat(fs)
-	if f := got["domain-new"]; f.Severity != finding.Medium || !strings.Contains(f.Title, "22 days ago") {
+	if f := got["domain-new"]; f.Severity != finding.High || f.Title != "Domain only 22 days old (registered Dec 2025)" {
 		t.Fatalf("new domain selling: %+v", got)
 	}
 	if _, ok := got["domain-expiring"]; !ok {
 		t.Fatalf("expiring domain: %+v", got)
 	}
-	if f := got["email-spoofable"]; !strings.Contains(f.Title, "no SPF record, DMARC policy is p=none") {
+	if f := got["email-spoofable"]; f.Title != "Email in bestdeals-outlet.com's name can be faked (no SPF record, DMARC policy is p=none (monitor only))" {
 		t.Fatalf("spoofable email: %+v", got)
 	}
 	if f := got["brand-mismatch"]; !strings.Contains(f.Title, `"Nike"`) {
@@ -92,6 +92,20 @@ func TestSubdomainProductName(t *testing.T) {
 	_, id, _, _ := a.assess(context.Background(), ws, nil, nil, now)
 	if !id.BrandMatches {
 		t.Fatalf("a subdomain product may carry the subdomain's name: %+v", id)
+	}
+}
+
+func TestSixMonthOldShopIsNew(t *testing.T) {
+	srv := registry(t, "2025-07-15T00:00:00Z", "2026-07-15T00:00:00Z")
+	a := &Analyzer{Bootstrap: srv.URL + "/bootstrap", LookupTXT: dns(map[string][]string{"indraft.pub": {"v=spf1 ~all"}, "_dmarc.indraft.pub": {"v=DMARC1; p=none;"}})}
+	ws := &facts.WebSnapshot{FinalURL: "https://indraft.pub/", Body: `<title>Indraft</title>`}
+	fs, _, _, _ := a.assess(context.Background(), ws, &facts.Commerce{Sells: true}, srv.Client(), now)
+	got := byCat(fs)
+	if f := got["domain-new"]; f.Severity != finding.Medium || f.Title != "Domain only about 5 months old (registered Jul 2025)" {
+		t.Fatalf("under six months and selling: %+v", got)
+	}
+	if f := got["email-spoofable"]; !strings.HasPrefix(f.Title, "Email in Indraft's name can be faked") {
+		t.Fatalf("names the brand: %+v", f)
 	}
 }
 
