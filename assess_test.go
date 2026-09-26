@@ -119,6 +119,19 @@ func TestEmailNamesTheDomainWhenTheTitleIsNotTheBrand(t *testing.T) {
 	}
 }
 
+func TestTitleAndPreviewNamesDiffer(t *testing.T) {
+	a := &Analyzer{}
+	ws := &facts.WebSnapshot{FinalURL: "https://tally.example.com/", Body: `<title>Tally — rotas</title><meta property="og:site_name" content="ShiftBoss">`}
+	fs, _, _, _ := a.assess(context.Background(), ws, nil, nil, now)
+	if f := byCat(fs)["brand-inconsistent"]; !strings.Contains(f.Title, `"ShiftBoss"`) {
+		t.Fatalf("two names for one product: %+v", fs)
+	}
+	ws.Body = `<title>Tally — rotas</title><meta property="og:site_name" content="Tally">`
+	if fs, _, _, _ := a.assess(context.Background(), ws, nil, nil, now); len(byCat(fs)) != 0 {
+		t.Fatalf("same name: %+v", fs)
+	}
+}
+
 func TestOfflineAndIPs(t *testing.T) {
 	a := &Analyzer{}
 	ws := &facts.WebSnapshot{FinalURL: "http://127.0.0.1:8080/", Body: `<title>Whatever</title>`}

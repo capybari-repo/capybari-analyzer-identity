@@ -233,6 +233,32 @@ func (a *Analyzer) assess(ctx context.Context, ws *facts.WebSnapshot, com *facts
 			Remediation: &finding.Remediation{Summary: "Publish an SPF record and a DMARC record with p=quarantine or p=reject."},
 		})
 	}
+	// The name should be the same in the browser tab and in link previews.
+	if m := reSiteName.FindStringSubmatch(ws.Body); m != nil {
+		site := strings.TrimSpace(m[1] + m[2])
+		var title string
+		if t := reTitle.FindStringSubmatch(ws.Body); t != nil {
+			title = strings.TrimSpace(webtext.Visible(t[1]))
+		}
+		ns, nt := norm(site), norm(title)
+		if len(ns) >= 3 && len(nt) >= 3 && !strings.Contains(nt, ns) && !strings.Contains(ns, nt) {
+			consistent := false
+			for _, part := range reSep.Split(title, -1) {
+				if np := norm(part); len(np) >= 3 && (strings.Contains(ns, np) || strings.Contains(np, ns)) {
+					consistent = true
+				}
+			}
+			if !consistent {
+				add(finding.Finding{
+					Category: "brand-inconsistent", Severity: finding.Low, Confidence: finding.ConfidenceMedium,
+					Title:       fmt.Sprintf("Site name differs between the page title and link previews (%q vs %q)", truncate(title, 40), truncate(site, 30)),
+					Description: "The name in the browser tab and the name shown when the site is shared (og:site_name) do not match. That happens after rebrands and with copied templates; either way, visitors see two names for one product.",
+					Evidence:    []finding.Evidence{{Location: finding.Location{URL: ws.FinalURL}, Detail: fmt.Sprintf("title %q; og:site_name %q", title, site)}},
+					Remediation: &finding.Remediation{Summary: "Use the same product name in <title> and og:site_name."},
+				})
+			}
+		}
+	}
 	if id.BrandEvaluated && !id.BrandMatches {
 		add(finding.Finding{
 			Category: "brand-mismatch", Severity: finding.Low, Confidence: finding.ConfidenceLow,
